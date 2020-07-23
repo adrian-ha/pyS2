@@ -67,7 +67,7 @@ class s2:
         else:
             self.optimize_alpha()
             
-    def X_matrix():
+    def X_matrix(self):
         """
         N x M matrix containing cash flows of N observable instruments and M payment dates.
         For zero rates where it is assumed that all rates up to the LLP are liquid this simplifies to N x N matrix
@@ -78,7 +78,7 @@ class s2:
             X = np.zeros([self.N, self.M])
             for n in range(0, self.N):
                 maturity_in_years = self.liquid_maturities[n]
-                rate = self.liquid_rate[n]
+                rate = self.liquid_rates[n]
                 for m in range(0, maturity_in_years - 1):
                     X[n, m] = rate
                 X[n, maturity_in_years - 1] = 1.0 + rate
@@ -112,7 +112,7 @@ class s2:
         """
         Returns interest rate for n-th liquid instrument (1 to N)
         """
-        return self.liquid_rate[n-1]
+        return self.liquid_rates[n-1]
         
     def wilson_function(self, i, j):
         """
