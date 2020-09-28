@@ -154,7 +154,7 @@ class s2:
         Observed zero coupon / swap prices
         """
         if self.rate_type == "zero":
-            return (1 + self.r_observed(n) ** (-self.t_observed))
+            return ((1 + self.r_observed(n)) ** (-self.t_observed(n)))
         else:
             #Par swap rates by construction have a value of 1.0 units
             return 1.0
@@ -211,8 +211,7 @@ class s2:
         1) alpha >= 0.05
         2) g_alpha() <= tau (certain precision)
         """
-        
-        bounds = (0.05, None)
+        bounds = [(0.05, None)]
         constraints = ({"type": "ineq", "fun": self.constraint_precision}) #>=0
         
         optimize_result = minimize(fun=self.error_function,
@@ -271,34 +270,4 @@ class s2:
         Returns extrapolated forward curve
         """
         return np.array([self.forward_rate(year) for year in range(start, end + 1)])
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 
