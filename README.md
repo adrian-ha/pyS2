@@ -1,5 +1,5 @@
-# s2_smith-wilson
- Python implementation of the Smith-Wilson extrapolation algorithm
+# s2_rates
+ Python implementation of the Smith-Wilson extrapolation algorithm.
 
 __!!!!! First draft !!!!!__<br>
 __!!!!! Still under active development !!!!!__<br>
