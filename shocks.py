@@ -3,19 +3,13 @@ import numpy as np
 
 def get_eiopa_shock(method="standard"):
     """
+    Stores interest rate shocks and returns respective pd.DataFrame.
 
-
-    Parameters
-    --------------
-
-
-
-    Returns
-    --------------
-
+    :param method: 'standard' or 'review'
+    :return: pd.DataFrame with all shocks
     """
     # Input checks
-    assert method in ("standard", "new")
+    assert method in ("standard", "review")
 
     # Different shocks as described by EIOPA
     if method == "standard":
@@ -31,7 +25,7 @@ def get_eiopa_shock(method="standard"):
         up_absolute_60 = 0.0
         down_absolute_60 = 0.0
 
-    if method == "new":
+    elif method == "review":
         floor = -0.0125
 
         up_relative_20 = [0.61, 0.53, 0.49, 0.46, 0.45, 0.41, 0.37, 0.34, 0.32, 0.3, 0.3, 0.3, 0.3, 0.29, 0.28, 0.28, 0.27, 0.26, 0.26, 0.25]
@@ -43,6 +37,8 @@ def get_eiopa_shock(method="standard"):
         down_relative_90 = 0.2
         up_absolute_60 = 0.0
         down_absolute_60 = 0.0
+    else:
+        raise ValueError("Unknown parameter for variable 'method'. Please insert either 'standard' or 'review'")
 
     # Define output matrix
     output = pd.DataFrame({"MATURITY": np.arange(0, 120) + 1,
@@ -74,42 +70,36 @@ def apply_shock(extrapolated_zero_curve, method="standard"):
     """
     Calculation of absolute rate shocks in up & down scenario of S2.
 
-    Parameters
-    ----------
-    extrapolated_zero_curve: 1 dimensional Ndarray
-        basic risk free term structure
-    method: str
-        One can decide to apply the standard rate shocks or the shocks as proposed by EIOPA in 2020
-
-    Returns
-    -------
-    rate_shock_abs: pd.DataFrame
-        Contains absolute rate upward & downward rate shock
+    :param extrapolated_zero_curve: one-dimensional Ndarray with basic risk free term structure: 1d-Ndarray
+    :param method: apply standard rate shocks or the shocks as proposed by EIOPA in 2020 review: str
+    :return: Contains absolute upward & downward rate shock: pd.DataFrame
     """
-
-    # Get relative & absolute shocks
-    shocks = get_eiopa_schock(method=method)
+    # get relative & absolute shocks
+    shocks = get_eiopa_shock(method=method)
 
     if method == "standard":
-        # Only rates greater than 0% should be shocked
+        # only rates greater than 0% should be shocked
         rate_floor = 0.0
         rate_floor_idx = extrapolated_zero_curve > rate_floor
 
-        # Calculate shocked curves
+        # calculate shocked curves
         s2_spot_down = extrapolated_zero_curve * (1 - shocks["DOWN_RELATIVE"].values * rate_floor_idx * 1)
-        s2_spot_up = extrapolated_zero_curve + np.clip(extrapolated_zero_curve * (shocks["UP_RELATIVE"].values), 0.01,
-                                                       None)
+        s2_spot_up = extrapolated_zero_curve + np.clip(extrapolated_zero_curve * (shocks["UP_RELATIVE"].values), 0.01, None)
 
-    if method == "proposal":
+    if method == "review":
         # Calculate shocked curves
         s2_spot_down = extrapolated_zero_curve * (1 - shocks["DOWN_RELATIVE"].values) - shocks["DOWN_ABSOLUTE"].values
         s2_spot_up = extrapolated_zero_curve * (1 + shocks["UP_RELATIVE"].values) + shocks["UP_ABSOLUTE"].values
 
-    # Absolute rate shock
+        #implement lower floor for rates
+        rate_floor = shocks.iloc[0,-1].values[0]
+        s2_spot_down = np.clip(s2_spot_down, rate_floor, 1000000)
+
+    # absolute rate shock
     rate_shock_down = s2_spot_down - extrapolated_zero_curve
     rate_shock_up = s2_spot_up - extrapolated_zero_curve
 
-    # Output contains absolute rate shocks
+    # output contains absolute rate shocks
     rate_shock_abs = pd.DataFrame({"abs_shock_down": rate_shock_down, "abs_shock_up": rate_shock_up})
 
     return rate_shock_abs

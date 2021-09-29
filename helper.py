@@ -1,6 +1,9 @@
 def dcf_to_zero(dcf):
     """
-    Helper function transforms sorted discount factors to zero rates
+    Helper function transforms sorted discount factors to zero rates.
+
+    :param dcf: discount factors
+    :return: zero rates
     """
     num_dcf = len(dcf)
     zero_rates = num_dcf * [0]
@@ -12,7 +15,10 @@ def dcf_to_zero(dcf):
 
 def zero_to_dcf(zero_rates):
     """
-    Helper function transforms sorted zero rates to discount factors
+    Helper function transforms sorted zero rates to discount factors.
+
+    :param zero_rates: zero rates
+    :return: discount factors
     """
     num_rates = len(zero_rates)
     dcf = num_rates * [0]
@@ -24,7 +30,10 @@ def zero_to_dcf(zero_rates):
 
 def swap_to_dcf(swap_rates):
     """
-    Helper function transforms sorted swap rates to discount factors
+    Helper function transforms sorted swap rates to discount factors.
+
+    :param swap_rates: par swap rates
+    :return: discount factors
     """
     num_rates = len(swap_rates)
     dcf = num_rates * [0]
@@ -38,7 +47,10 @@ def swap_to_dcf(swap_rates):
 
 def dcf_to_swap(dcf):
     """
-    Helper function transforms sorted discount factors to swap rates
+    Helper function transforms sorted discount factors to swap rates.
+
+    :param dcf: discount factors
+    :return: par swap rates
     """
     num_dcf = len(dcf)
     swap_rates = num_dcf * [0]
@@ -52,7 +64,10 @@ def dcf_to_swap(dcf):
 
 def swap_to_zero(swap_rates):
     """
-    Helper function transforms sorted swap rates to zero rates
+    Helper function transforms sorted swap rates to zero rates.
+
+    :param swap_rates: par swap rates
+    :return: zero rates
     """
     swap_rates = list(swap_rates)
     dcf = swap_to_dcf(swap_rates)
@@ -62,7 +77,10 @@ def swap_to_zero(swap_rates):
 
 def zero_to_swap(zero_rates):
     """
-    Helper function transforms sorted zero rates to swap rates
+    Helper function transforms sorted zero rates to swap rates.
+
+    :param zero_rates: zero rates
+    :return: par swap rates
     """
     zero_rates = list(zero_rates)
     dcf = zero_to_dcf(zero_rates)

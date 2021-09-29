@@ -1,10 +1,19 @@
-
+import numpy as np
+from scipy.optimize import minimize
+from scipy.interpolate import interp1d
 
 
 def compute_fwd_interpolation(fwd, swap_rate_end, zero_rates_known, start_tenor, end_tenor):
     """
-    Interpolates forward rates as described by EIOPA in
-    "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.787f
+    Interpolates forward rates as described by EIOPA (constant forward rates between liquid maturities).
+    Source: 'Background Document On The Opinion On The 2020 Review Of Solvency II' p.787f.
+
+    :param fwd: fwd to be calculated: 1d-Ndarray
+    :param swap_rate_end: last liquid swap rate in interval. E.g. for 15y --> 20y period this would be 20y swap rate: 1d-Ndarray
+    :param zero_rates_known: zero rates known so far: 1d-Ndarray
+    :param start_tenor: last known tenor / maturity: float
+    :param end_tenor: final tenor / maturity (end of interpolation): float
+    :return: cash value of swap (par swap = 1)
     """
     left_side_1 = sum([1. / ((1+rate)**(t+1)) for t, rate in enumerate(zero_rates_known)])
     left_side_2 = sum([1. / ((1+fwd)**t) for t in range(1, end_tenor - start_tenor + 1)])
@@ -16,6 +25,10 @@ def compute_fwd_interpolation(fwd, swap_rate_end, zero_rates_known, start_tenor,
 def error_fwd_interpolation(fwd, args):
     """
     Error function for numeric procedure required to interpolate between observed liquid market rates
+
+    :param fwd: dummy forward rate (rate is later used for numeric operation)
+    :param args: optimization parameters
+    :return: (cash value of swap - 1) ---> if fwd rate is solved for this should be minimized
     """
     swap_rate_end = args[0]
     zero_rates_known = args[1]
@@ -27,25 +40,15 @@ def error_fwd_interpolation(fwd, args):
 
 def interpolate_fwd(fwd, swap_rate_end, zero_rates_known, start_tenor, end_tenor):
     """
-    Interpolates forward rates according to methodology described in "EIOPA - Background Analysis p. 788"
+    Interpolates forward rates according to methodology described by EIOPA review 2020.
+    Source: 'Background Document On The Opinion On The 2020 Review Of Solvency II' p.788
 
-    Parameters
-    ----------
-    fwd: 1 dimensional Ndarray
-        fwd to be calculated
-    swap_rate_end: DataFrame
-        final swap rate. E.g. for 15y --> 20y period this would be 20y swap rate
-    zero_rates_known: 1 dimensional Ndarray
-        Zero rates known so far
-    start_tenor: float
-        last known tenor
-    end_tenor: float
-        final tenor (end of interpolation)
-
-    Returns
-    -------
-    final_fwd: 1 dimensional Ndarray
-        fwd that can be used for calculation of all zero rates in between the observed swap rates
+    :param fwd: fwd to be calculated: 1d-Ndarray
+    :param swap_rate_end: last liquid swap rate in interval. E.g. for 15y --> 20y period this would be 20y swap rate: 1d-Ndarray
+    :param zero_rates_known: zero rates known so far: 1d-Ndarray
+    :param start_tenor: last known tenor / maturity: float
+    :param end_tenor: final tenor / maturity (end of interpolation): float
+    :return: final_fwd that can be used for calculation of all zero rates in between the observed swap rates: 1d-Ndarray
     """
     # Optimization tolerance
     TOLERANCE = 1e-10
@@ -74,22 +77,13 @@ def interpolate_fwd(fwd, swap_rate_end, zero_rates_known, start_tenor, end_tenor
 
 def compute_interpolated_zero(swap_rates_market, liquid_maturities):
     """
-    Based on swap rates with maturity of 1-12, 15, 20, 25, 30, 40 and 50 years this function builds the forwards and zero rates.
-    Methodology as described by EIOPA in "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.787f.
+    Based on swap rates with maturity of 1-12, 15, 20, 25, 30, 40 and 50 years this function builds the forward and zero rates.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.787f.
 
-    Parameters
-    ----------
-    swap_rates_market: 1 dimensional Ndarray
-        market rates where index position indicates maturity (e.g. [4] corresponds to a maturity of 5y)
-    liquid_maturities: 1 dimensional Ndarray
-        maturities of the respective interest rates
-
-    Returns
-    -------
-    zero_rates_market_interpolated: list
-        contains interpolated zero curve based on liquid swap rates
+    :param swap_rates_market: market rates where index position indicates maturity (e.g. [4] corresponds to a maturity of 5y): Ndarray
+    :param liquid_maturities: maturities of the respective interest rates: 1d-Ndarry
+    :return: contains interpolated zero curve based on liquid swap rates: list
     """
-
     # Creates dummy to start interpolation
     fwd_dummy = np.array([0.01])
 
@@ -97,7 +91,7 @@ def compute_interpolated_zero(swap_rates_market, liquid_maturities):
     N = len(liquid_maturities)
 
     # Construct zero rates
-    zero_rates_market = np.array(pyData.swap_to_zero(swap_rates_market))
+    zero_rates_market = np.array(swap_to_zero(swap_rates_market))
 
     # Starting point of zero curve with interpolation
     zero_rates_market_interpolated = [zero_rates_market[0]]
@@ -130,25 +124,13 @@ def compute_interpolated_zero(swap_rates_market, liquid_maturities):
 def extract_fwds(zero_rates_market_interpolated, liquid_maturities, fsp=20):
     """
     Extracts main (interpolated) forwards.
-    Methodology as described by EIOPA in "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.787ff.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.787ff.
 
-    Parameters
-    ----------
-    zero_rates_market_interpolated: 1 dimensional Ndarray
-        interpolated zero rates where index position indicates maturity (e.g. [4] corresponds to a maturity of 5y)
-    liquid_maturities: 1 dimensional Ndarray
-        maturities of the respective interest rates
-    fsp: float
-        maturity in years of first smoothing point
-
-    Returns
-    -------
-    forwards_pre_fsp: list
-        forward rates based on main liquid interpolated rates before fsp
-    forwards_llfr: list
-        forward rates based on main liquid interpolated rates required for llfr calculation
+    :param zero_rates_market_interpolated: interpolated zero rates where index position indicates maturity (e.g. [4] corresponds to a maturity of 5y): 1d-Ndarray
+    :param liquid_maturities: maturities of the respective interest rates: 1d-Ndarray
+    :param fsp: maturity in years of first smoothing point: float
+    :return: forwards_pre_fsp & forwards_llfr (rates required for llfr calculation): list
     """
-
     # Number of liquid maturities
     N = len(liquid_maturities)
 
@@ -184,8 +166,8 @@ def extract_fwds(zero_rates_market_interpolated, liquid_maturities, fsp=20):
 
 def compute_llfr(fwd, volume=np.array([3.3, 1.45 , 6, 0.3, 0.4]), va=0.0):
     """
-    Calculates last liquid forward rate (llfr) as described by EIOPA in
-    "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.788f
+    Calculates last liquid forward rate (llfr) as described by EIOPA review 2020.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.788f.
 
     volume[0] = 20y
     volume[1] = 25y
@@ -197,6 +179,11 @@ def compute_llfr(fwd, volume=np.array([3.3, 1.45 , 6, 0.3, 0.4]), va=0.0):
     fwd[2] = 20y-30y --> 20y10y
     fwd[3] = 20y-40y --> 20y20y
     fwd[4] = 20y-50y --> 20y30y
+
+    :param fwd: forward rates: 1d-Ndarray
+    :param volume: respective volume / weighting of forward rates: 1d-Ndarray
+    :param va: volatility adjustment in bps (as float, e.g. 10): float
+    :return: last liquid forward rate
     """
     weight = volume / volume.sum()
     fwds_incl_va = fwd.copy()
@@ -207,26 +194,15 @@ def compute_llfr(fwd, volume=np.array([3.3, 1.45 , 6, 0.3, 0.4]), va=0.0):
 
 def compute_curve_with_va(forwards_pre_fsp, liquid_maturities, fsp=20, va=0):
     """
-    Constructs zero curve from forwards until FPS  - potentially including VA up .
-    Methodology as described by EIOPA in "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.788f.
+    Constructs zero curve from forwards until FPS  - potentially including VA.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.788f.
 
-    Parameters
-    ----------
-    forwards_pre_fsp: 1 dimensional Ndarray
-        forwards between liquid rates
-    liquid_maturities: 1 dimensional Ndarray
-        maturities of the respective interest rates
-    fsp: float
-        maturity in years of first smoothing point
-    va: float
-        volatility adjustment
-
-    Returns
-    -------
-    zero_rates: list
-        contains interpolated zero curve up to a maturity of 20y including va
+    :param forwards_pre_fsp: forwards between liquid rates: 1d-Ndarray
+    :param liquid_maturities: maturities of the respective interest rates: 1d-Ndarray
+    :param fsp: maturity in years of first smoothing point: float
+    :param va: volatility adjustment: float
+    :return: contains interpolated zero curve up to a maturity of 20y including va: list
     """
-
     # Number of liquid maturities smaller than or equal to fsp
     N = len(liquid_maturities[liquid_maturities <= fsp])
 
@@ -276,23 +252,17 @@ def big_b(h, alpha=0.1):
 
 def extrapolate_fwds(h, ufr, llfr, alpha=0.10):
     """
-    Methodology as described by EIOPA in "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.789.
+    Extrapolates forward rates beyond fsp.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.789.
 
-    Parameters
-    ----------
-    h: 1 dimensional Ndarray
-        tbd
-    ufr: 1 dimensional Ndarray
-        tbd
-    llfr: 1 dimensional Ndarray
-        tbd
-    alpha: float
-        tbd
-
-    Returns
-    -------
-    fwd_fsp_fsp_plus_h: 1 dimensional Ndarray
+    fwd_fsp_fsp_plus_h:
         fwd that can be used for calculation of all zero rates in between the observed swap rates
+
+    :param h: forward rate beyond fsp (at year 20+h): 1d-Ndarray
+    :param ufr: ultimate forward rate: 1d-Ndarray
+    :param llfr: last liquid forward rate: 1d-Ndarray
+    :param alpha: convergence speed: float
+    :return: fwd_fsp_fsp_plus_h: 1d-Ndarray
     """
     fwd_fsp_fsp_plus_h = np.log(1 + ufr) + (llfr - np.log(1 + ufr)) * big_b(h, alpha)
     return fwd_fsp_fsp_plus_h
@@ -300,7 +270,15 @@ def extrapolate_fwds(h, ufr, llfr, alpha=0.10):
 
 def extrapolate_zero(known_zero_rates, ufr, llfr, alpha=0.10, fsp=20):
     """
-    Methodology as described by EIOPA in "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.790.
+    Extrapolation of zero rates beyond fsp.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.790.
+
+    :param known_zero_rates:
+    :param ufr: ultimate forward rate
+    :param llfr: last liquid forward rate
+    :param alpha: convergence speed
+    :param fsp: first-smoothing-point
+    :return: extrapolated_zero_rates: 1d-Ndarray
     """
     # FSP
     z_fsp = known_zero_rates[fsp - 1]
@@ -319,11 +297,19 @@ def extrapolate_zero(known_zero_rates, ufr, llfr, alpha=0.10, fsp=20):
     return extrapolated_zero_rates
 
 
-def alternative_extrapolation(input_rates, input_liquid, ufr, fsp=20, alpha=None, va=0.0,
-                              volume_traded=np.array([3.3, 1.45, 6, 0.3, 0.4])):
+def alternative_extrapolation(input_rates, input_liquid, ufr, fsp=20, alpha=None, va=0.0, volume_traded=np.array([3.3, 1.45, 6, 0.3, 0.4])):
     """
     Wrapper function for alternative extrapolation method of SII curves.
-    Methodology as described by EIOPA in "Background Document On The Optinion On The 2020 Revicew Of Solvency II" p.783-790.
+    Source: "Background Document On The Opinion On The 2020 Review Of Solvency II" p.783-790.
+
+    :param input_rates:
+    :param input_liquid:
+    :param ufr: ultimate forward rate
+    :param fsp: first-smoothing-point
+    :param alpha: convergence speed
+    :param va: volatility adjustment
+    :param volume_traded: weighting for llfr
+    :return:
     """
 
     # Assign base variables
@@ -343,7 +329,7 @@ def alternative_extrapolation(input_rates, input_liquid, ufr, fsp=20, alpha=None
     forwards_pre_fsp, forwards_llfr = extract_fwds(zero_rates_market_interpolated, liquid_maturities, fsp)
 
     # Last liquid forward rate
-    llfr = compute_llfr(forwards_llfr, va=va)
+    llfr = compute_llfr(forwards_llfr, va=va, volume=volume_traded)
 
     # Zero curve including potential volatility adjustment
     zero_curve_va = compute_curve_with_va(forwards_pre_fsp, liquid_maturities, fsp, va)

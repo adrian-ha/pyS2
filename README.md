@@ -2,16 +2,19 @@
 
 -----------------------------------------
 ## 1) Introduction
-This python repository approximates the interest rate curve construction and 
-extrapolation described by the European insurance regulator EIOPA in the Solvency 2 regime.
+This python repository approximates the interest rate curve construction,  
+extrapolation and shocks described by the European insurance regulator EIOPA in the 
+Solvency 2 regime.
 
-The two approaches below are implemented:
+The first two approaches of the below are implemented:
 1) Standard model
     * Smith-Wilson-Extrapolation
-    * Relative interest rate shocks
-2) 2020 review of Solvency II
+    * Interest rate shocks (relative)
+2) Review of Solvency II 2020
     * Alternative extrapolation
-    * New interest rate shocks (relative + absolute)
+    * Interest rate shocks (relative + absolute)
+3) EC communication 2021 (published 22.09.2021)
+    * tbd
 
 As mentioned, the script is simply an approximation and toy project that may 
 contain substantial errors. 
@@ -20,6 +23,6 @@ Please let me know if you have any comments or feedback.
 
 -----------------------------------------
 ## 2) Examples
-TBD
+tbd
 
 

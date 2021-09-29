@@ -1,10 +1,10 @@
-#Imports
+# imports
 import numpy as np
 from math import exp, log
 from scipy.optimize import minimize
 
 
-class smith_wilson:
+class smithWilson:
 
     def __init__(self, input_rates, input_liquid, ufr, alpha=None, min_convergence_year=60, rate_type="zero"):
         """
@@ -12,30 +12,22 @@ class smith_wilson:
         --------------
         -CRA: subtracted before rates are inserted
         -VA: added before rates are inserted
-        -n_coupons: currently only annual coupon paying instruments are supported!
+        -n_coupons: currently only annual coupon paying instruments are supported
         -zero_coupon rates are all assumed to be liquid up to LLP
         -input_rates and input_liquid should match in length
 
-        Inputs
-        --------------
-        input_rates: array
-            Interest rates where position matches maturity in years (e.g. index position 0 is 1y, index position 1 is 2y...)
-        input_liquid: array
-            Boolean indicator whether respective rate is considered liquid
-        ufr: float
-            Ultimate forward rate for extrapolation
-        alpha: float
-            speed of convergence
-        min_convergence_year: int
-            convergence_point = max(min_convergence_year, last_liquid_point + 40)
-        rate_type: string
-            Either "zero" or "swap" depending on rate input
+        :param input_rates: market rates where index position indicates maturity (e.g. [4] corresponds to a maturity of 5y): Ndarray
+        :param input_liquid: Boolean indicator whether respective rate is considered liquid: array
+        :param ufr: Ultimate forward rate for extrapolation: float
+        :param alpha: speed of convergence: float
+        :param min_convergence_year: convergence_point = max(min_convergence_year, last_liquid_point + 40): int
+        :param rate_type: Either "zero" or "swap" depending on rate input: string
         """
-
-        # Input checks
+        # check inputs
         assert len(input_rates) == len(input_liquid)
         assert rate_type in ["zero", "swap"]
 
+        # assign parameters
         self.ufr = ufr
         self.lnUfr = log(1 + ufr)
         self.rate_type = rate_type
@@ -47,18 +39,19 @@ class smith_wilson:
         self.convergence_point = max(min_convergence_year, self.last_liquid_point + 40)
         self.tau = 0.0001  # 1bps
 
-        # Dimensions of matrices
+        # dimensions of matrices
         self.M = int(self.last_liquid_point)
         self.N = len(self.liquid_maturities)
 
-        # If no alpha is provided, it is optimized
+        # if no alpha is provided, it is optimized
         if alpha is not None:
             self.alpha = np.array(alpha)
         else:
             self.optimize_alpha()
 
-        self.zero_curve = self.zero_curve(start=1, end=120)
-        self.forward_curve = self.zero_curve(start=1, end=120)
+        # calculate zero and 1y fwd curve up to 120y
+        # self.zero_curve = self.zero_curve(start=1, end=120)
+        # self.forward_curve = self.forward_curve(start=1, end=120)
 
     def X_matrix(self):
         """
@@ -148,7 +141,7 @@ class smith_wilson:
         Observed zero coupon / swap prices
         """
         if self.rate_type == "zero":
-            return ((1 + self.r_observed(n)) ** (-self.t_observed(n)))
+            return (1 + self.r_observed(n)) ** (-self.t_observed(n))
         else:
             # Par swap rates by construction have a value of 1.0 units
             return 1.0
@@ -268,28 +261,36 @@ class smith_wilson:
         return np.array([self.forward_rate(year) for year in range(start, end + 1)])
 
 
-def sm_extrapolation(input_rates, input_liquid, ufr, alpha=None, min_convergence_year=60, rate_type="swap", va=0):
+def sm_extrapolation(input_rates, input_liquid, ufr=0.036, alpha=None, min_convergence_year=60, rate_type="swap", cra=10, va=0):
     """
-    ATTENTION - misuse of object oriented approch to create quick and dirty wrapper function
+    ATTENTION - misuse of object-oriented programming approach to create quick and dirty wrapper function for EUR swaps.
 
+    :param input_rates: par swap rates
+    :param input_liquid: binary indicator whether interest rate (maturity) is considered liquid
+    :param ufr: ultimate forward rate
+    :param alpha: convergence speed
+    :param min_convergence_year: converging point
+    :param rate_type: 'swap' or 'zero'
+    :param cra: credit risk adjustment
+    :param va: volatility adjustment
+    :return: extrapolated SII zero curve
     """
-    # Create basic risk free term structure
-    basic_curve_object = smith_wilson(input_rates, input_liquid, ufr=ufr, alpha=alpha,
-                                      min_convergence_year=min_convergence_year, rate_type=rate_type)
+    #subtract cra from swap rates
+    input_rates_minus_cra = input_rates - cra / 10000.0
+
+    #create basic risk free term structure
+    basic_curve_object = smithWilson(input_rates_minus_cra, input_liquid, ufr=ufr, alpha=alpha, min_convergence_year=min_convergence_year, rate_type=rate_type)
     extrapolated_zero_curve = basic_curve_object.zero_curve().flatten()
 
-    # Add va if required
+    #add va if required
     if va != 0:
         llp = basic_curve_object.last_liquid_point
         spot_input_for_va_curve = extrapolated_zero_curve + va / 10000.0
         liquid_rates_va = np.repeat(0, len(spot_input_for_va_curve))
         liquid_rates_va[0:llp] = 1.0
 
-        # Create rate object with zero rates input adjusted by va
-        basic_curve_object_va = smith_wilson(spot_input_for_va_curve, liquid_rates_va, ufr=ufr, alpha=alpha,
-                                             min_convergence_year=min_convergence_year, rate_type="zero")
-
-        # Get extrapolated s2 curves with va adjustment
+        #create rate object with zero rates input adjusted by va
+        basic_curve_object_va = smithWilson(spot_input_for_va_curve, liquid_rates_va, ufr=ufr, alpha=alpha, min_convergence_year=min_convergence_year, rate_type="zero")
         extrapolated_zero_curve = basic_curve_object_va.zero_curve().flatten()
 
     return extrapolated_zero_curve
